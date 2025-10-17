@@ -7,6 +7,21 @@ The application is controlled via a simple web-based user interface.
 
 
 ---
+---
+
+## 🖼️ Screenshots
+
+Here is a look at the application's user interface.
+| Full Web Page |
+| ![Screenshot of the full webpage](./assets/full-webpage.png)
+| Add & Mine Controls | Network & Difficulty |
+| :---: | :---: |
+| ![Screenshot of the main controls](./assets/controls.png) | ![Screenshot of network controls](./assets/network&diffuclty.png) |
+
+| Full Blockchain View | Running Multiple Nodes |
+| :---: | :---: |
+| ![Screenshot of the full chain view](./assets/blockchain.png) | ![Screenshot of the consensus mechanism](./assets/blockchain.png) |
+---
 
 ## ✨ Features
 
