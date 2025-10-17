@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blockchain Medical Records</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f7f6; }
+        .grid-container { display: grid; grid-template-columns: 1fr 2fr; gap: 40px; padding: 40px; align-items: start; }
+        .left-column { display: flex; flex-direction: column; gap: 40px; }
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1, h2 { color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; }
+        label { display: block; margin-top: 20px; color: #555; }
+        input, textarea { width: 100%; padding: 10px; margin-top: 5px; border-radius: 4px; border: 1px solid #ddd; box-sizing: border-box; }
+        button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; margin-top: 20px; cursor: pointer; font-size: 16px; width: 100%; }
+        button:hover { background-color: #0056b3; }
+        button.secondary { background-color: #28a745; }
+        button.secondary:hover { background-color: #218838; }
+        .status-message { margin-top: 20px; font-weight: bold; min-height: 20px; }
+        .block { border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 8px; background: #fafafa; word-break: break-all; }
+        .block p, .info-text p { margin: 5px 0; }
+        .block pre { background: #eee; padding: 10px; border-radius: 4px; white-space: pre-wrap; }
+        ul#nodesList { list-style-type: none; padding: 0; }
+        ul#nodesList li { background: #f0f0f0; padding: 5px 10px; border-radius: 4px; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+    <div class="grid-container">
+        <div class="left-column">
+            <div class="container">
+                <h2>Controls</h2>
+                <form id="recordForm">
+                    <label for="patient_id">Patient ID:</label>
+                    <input type="text" id="patient_id" name="patient_id" required>
+                    <label for="details">Record Details:</label>
+                    <textarea id="details" name="details" rows="4" required></textarea>
+                    <button type="submit">Add Record</button>
+                </form>
+                <button id="mineButton" class="secondary">Mine New Block</button>
+                <p class="status-message" id="recordResponse"></p>
+            </div>
+
+            <div class="container">
+                <h2>Network & Difficulty</h2>
+                <div class="info-text">
+                    <p>Current Mining Difficulty: <strong id="currentDifficulty">...</strong></p>
+                </div>
+                <form id="difficultyForm">
+                    <label for="newDifficulty">Set New Difficulty:</label>
+                    <input type="number" id="newDifficulty" name="newDifficulty" min="1" placeholder="e.g., 5" required>
+                    <button type="submit">Set Difficulty</button>
+                </form>
+                <hr>
+                <form id="registerNodeForm">
+                    <label for="nodeAddress">Node Address (e.g., 127.0.0.1:5001):</label>
+                    <input type="text" id="nodeAddress" name="nodeAddress" required>
+                    <button type="submit">Register Node</button>
+                </form>
+                <hr>
+                <button id="resolveConflictsButton">Resolve Conflicts (Run Consensus)</button>
+                <p class="status-message" id="resolveResponse"></p>
+                <h3>Known Nodes:</h3>
+                <ul id="nodesList"></ul>
+            </div>
+        </div>
+
+        <div class="container">
+            <h2>Current Blockchain</h2>
+            <button id="refreshChain">Refresh Chain</button>
+            <div id="chainContainer"></div>
+        </div>
+    </div>
+
+
+    <script>
+    // --- Get all our elements ---
+    const recordForm = document.getElementById('recordForm');
+    const mineButton = document.getElementById('mineButton');
+    const recordResponseElem = document.getElementById('recordResponse');
+    const difficultyForm = document.getElementById('difficultyForm');
+    const currentDifficultyElem = document.getElementById('currentDifficulty');
+    const registerNodeForm = document.getElementById('registerNodeForm');
+    const resolveConflictsButton = document.getElementById('resolveConflictsButton');
+    const resolveResponseElem = document.getElementById('resolveResponse');
+    const nodesListElem = document.getElementById('nodesList');
+    const refreshChainButton = document.getElementById('refreshChain');
+    const chainContainer = document.getElementById('chainContainer');
+
+    // --- LOGIC FUNCTIONS (Defined only once) ---
+    const fetchAndDisplayChain = async () => {
+        chainContainer.innerHTML = '<p>Loading chain...</p>';
+        const response = await fetch('/chain');
+        const data = await response.json();
+        chainContainer.innerHTML = '';
+        data.chain.forEach(block => {
+            const blockElement = document.createElement('div');
+            blockElement.className = 'block';
+            const formattedData = JSON.stringify(block.data, null, 2);
+            blockElement.innerHTML = `<p><strong>Index:</strong> ${block.index}</p><p><strong>Timestamp:</strong> ${new Date(block.timestamp * 1000).toLocaleString()}</p><p><strong>Hash:</strong> ${block.hash}</p><p><strong>Previous Hash:</strong> ${block.previous_hash}</p><p><strong>Proof:</strong> ${block.proof}</p><p><strong>Data:</strong></p><pre>${formattedData}</pre>`;
+            chainContainer.appendChild(blockElement);
+        });
+    };
+
+    const fetchAndDisplayNodes = async () => {
+        const response = await fetch('/nodes/get');
+        const data = await response.json();
+        nodesListElem.innerHTML = '';
+        data.nodes.forEach(node => {
+            const li = document.createElement('li');
+            li.textContent = node;
+            nodesListElem.appendChild(li);
+        });
+    };
+
+    const fetchAndDisplayDifficulty = async () => {
+        const response = await fetch('/difficulty');
+        const data = await response.json();
+        currentDifficultyElem.textContent = data.difficulty;
+    };
+
+
+    // --- EVENT LISTENERS ---
+    recordForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const patientId = document.getElementById('patient_id').value;
+        const details = document.getElementById('details').value;
+        const response = await fetch('/transactions/new', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patient_id: patientId, details: details }), });
+        const result = await response.json();
+        recordResponseElem.textContent = result.message;
+        recordForm.reset();
+    });
+
+    mineButton.addEventListener('click', async () => {
+        recordResponseElem.textContent = 'Mining a new block... (this may take a moment)';
+        const response = await fetch('/mine');
+        const result = await response.json();
+        recordResponseElem.textContent = result.message;
+        fetchAndDisplayChain();
+    });
+
+    registerNodeForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const nodeAddress = document.getElementById('nodeAddress').value;
+        const response = await fetch('/nodes/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nodes: [nodeAddress] }), });
+        const result = await response.json();
+        alert(result.message);
+        document.getElementById('registerNodeForm').reset();
+        fetchAndDisplayNodes();
+    });
+
+    resolveConflictsButton.addEventListener('click', async () => {
+        resolveResponseElem.textContent = 'Resolving conflicts...';
+        const response = await fetch('/nodes/resolve');
+        const result = await response.json();
+        resolveResponseElem.textContent = result.message;
+        fetchAndDisplayChain();
+    });
+
+    difficultyForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const newDifficulty = document.getElementById('newDifficulty').value;
+        const response = await fetch('/difficulty', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ difficulty: newDifficulty }),
+        });
+        const result = await response.json();
+        alert(result.message || result);
+        document.getElementById('difficultyForm').reset();
+        fetchAndDisplayDifficulty();
+    });
+
+    refreshChainButton.addEventListener('click', fetchAndDisplayChain);
+
+    // --- INITIAL PAGE LOAD ---
+    window.addEventListener('load', () => {
+        fetchAndDisplayChain();
+        fetchAndDisplayNodes();
+        fetchAndDisplayDifficulty();
+    });
+</script>
+</body>
+</html>
